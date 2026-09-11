@@ -1,0 +1,17 @@
+{
+  "listen": ":29900",
+  "target": "127.0.0.1:1080",
+  "key": "packetboost_secret",
+  "crypt": "aes-128",
+  "mode": "fast3",
+  "mtu": 1350,
+  "sndwnd": 1024,
+  "rcvwnd": 1024,
+  "datashard": 10,
+  "parityshard": 3,
+  "dscp": 46,
+  "nocomp": true,
+  "acknodelay": true,
+  "sockbuf": 16777217,
+  "keepalive": 10
+}
