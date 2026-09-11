@@ -74,15 +74,111 @@ jobs:
           # Build x86_64
           CGO_ENABLED=1 GOOS=android GOARCH=amd64 CC=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android30-clang go build -buildmode=c-shared -o "$JNI_X86_64/libpacketboost_core.so" bridge.go
 
-      - name: Prepare C++ JNI Files
+      - name: Self-Heal Android Project Configuration
         run: |
-          CMAKE_PATH=$(find . -name "CMakeLists.txt" | head -n 1)
-          if [ -n "$CMAKE_PATH" ]; then
-            CPP_DIR=$(dirname "$CMAKE_PATH")
-            JNI_SRC=$(find . -name "packetboost_jni.cpp" | head -n 1)
-            if [ -n "$JNI_SRC" ] && [ "$JNI_SRC" != "$CPP_DIR/packetboost_jni.cpp" ]; then
-              cp "$JNI_SRC" "$CPP_DIR/"
-            fi
+          MANIFEST_PATH=$(find . -name "AndroidManifest.xml" | head -n 1)
+          MAIN_DIR=$(dirname "$MANIFEST_PATH")
+          CPP_DIR="$MAIN_DIR/cpp"
+          mkdir -p "$CPP_DIR"
+
+          # 1. Ensure CMakeLists.txt is clean and points to local cpp
+          cat << 'EOF' > "$CPP_DIR/CMakeLists.txt"
+          cmake_minimum_required(VERSION 3.22.1)
+          project("packetboost_jni")
+
+          set(GO_CORE_LIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI})
+
+          add_library(packetboost_core SHARED IMPORTED)
+          set_target_properties(packetboost_core PROPERTIES
+              IMPORTED_LOCATION "${GO_CORE_LIB_DIR}/libpacketboost_core.so"
+          )
+
+          add_library(packetboost_jni SHARED packetboost_jni.cpp)
+
+          find_library(log-lib log)
+          find_library(android-lib android)
+
+          target_link_libraries(
+              packetboost_jni
+              packetboost_core
+              ${log-lib}
+              ${android-lib}
+          )
+          EOF
+
+          # 2. Ensure packetboost_jni.cpp is present in cpp directory
+          cat << 'EOF' > "$CPP_DIR/packetboost_jni.cpp"
+          #include <jni.h>
+          #include <string>
+          #include <cstdlib>
+          #include <android/log.h>
+
+          #define LOG_TAG "PacketBoostJNI"
+          #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+          #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+
+          extern "C" {
+              typedef int32_t GoInt32;
+              typedef int64_t GoInt64;
+
+              extern GoInt32 startNativeCore(GoInt32 tunFd, char* serverAddr, char* secretKey, GoInt32 mtu);
+              extern GoInt32 stopNativeCore();
+              extern char* getNativeCoreStats();
+          }
+
+          extern "C" JNIEXPORT jint JNICALL
+          Java_com_packetboost_app_NativeCoreBridge_startNativeCore(
+                  JNIEnv* env,
+                  jobject thiz,
+                  jint tunFd,
+                  jstring serverAddr,
+                  jstring secretKey,
+                  jint mtu) {
+
+              const char* c_serverAddr = env->GetStringUTFChars(serverAddr, nullptr);
+              const char* c_secretKey = env->GetStringUTFChars(secretKey, nullptr);
+
+              LOGI("JNI: Invoking startNativeCore (tunFd=%d, Server=%s, MTU=%d)", tunFd, c_serverAddr, mtu);
+
+              jint result = startNativeCore(
+                      static_cast<GoInt32>(tunFd),
+                      const_cast<char*>(c_serverAddr),
+                      const_cast<char*>(c_secretKey),
+                      static_cast<GoInt32>(mtu)
+              );
+
+              env->ReleaseStringUTFChars(serverAddr, c_serverAddr);
+              env->ReleaseStringUTFChars(secretKey, c_secretKey);
+
+              return result;
+          }
+
+          extern "C" JNIEXPORT jint JNICALL
+          Java_com_packetboost_app_NativeCoreBridge_stopNativeCore(
+                  JNIEnv* env,
+                  jobject thiz) {
+
+              LOGI("JNI: Invoking stopNativeCore()");
+              jint result = stopNativeCore();
+              return result;
+          }
+
+          extern "C" JNIEXPORT jstring JNICALL
+          Java_com_packetboost_app_NativeCoreBridge_getNativeCoreStats(
+                  JNIEnv* env,
+                  jobject thiz) {
+
+              char* c_stats = getNativeCoreStats();
+              jstring result = env->NewStringUTF(c_stats);
+              std::free(c_stats);
+              return result;
+          }
+          EOF
+
+          # 3. Fix Kotlin const val in MainActivity.kt
+          MAIN_ACTIVITY=$(find . -name "MainActivity.kt" | head -n 1)
+          if [ -n "$MAIN_ACTIVITY" ]; then
+            sed -i 's/private const val/private val/g' "$MAIN_ACTIVITY"
           fi
 
       - name: Build Android Debug APK
@@ -97,11 +193,12 @@ jobs:
 
           # Ensure android.useAndroidX=true in gradle.properties
           touch gradle.properties
+          echo "" >> gradle.properties
           echo "android.useAndroidX=true" >> gradle.properties
           echo "android.nonTransitiveRClass=true" >> gradle.properties
           echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> gradle.properties
 
-          # Auto-remove broken test references from app/build.gradle.kts
+          # Remove broken test references from app/build.gradle.kts
           find . -name "build.gradle.kts" -exec sed -i '/androidTestImplementation/d' {} +
           find . -name "build.gradle.kts" -exec sed -i '/ui\.test/d' {} +
 
