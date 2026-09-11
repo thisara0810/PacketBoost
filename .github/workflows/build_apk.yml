@@ -51,9 +51,11 @@ jobs:
           
           JNI_ARM64="$(pwd)/$MAIN_DIR/jniLibs/arm64-v8a"
           JNI_ARMV7="$(pwd)/$MAIN_DIR/jniLibs/armeabi-v7a"
+          JNI_X86_64="$(pwd)/$MAIN_DIR/jniLibs/x86_64"
           
           mkdir -p "$JNI_ARM64"
           mkdir -p "$JNI_ARMV7"
+          mkdir -p "$JNI_X86_64"
           
           cd "$CORE_DIR"
           rm -f go.mod go.sum
@@ -67,6 +69,9 @@ jobs:
           
           # Build armeabi-v7a
           CGO_ENABLED=1 GOOS=android GOARCH=arm GOARM=7 CC=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi30-clang go build -buildmode=c-shared -o "$JNI_ARMV7/libpacketboost_core.so" bridge.go
+
+          # Build x86_64
+          CGO_ENABLED=1 GOOS=android GOARCH=amd64 CC=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android30-clang go build -buildmode=c-shared -o "$JNI_X86_64/libpacketboost_core.so" bridge.go
 
       - name: Build Android Debug APK
         run: |
