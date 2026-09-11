@@ -36,11 +36,6 @@ jobs:
           echo "Using NDK from: $NDK_PATH"
           echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
 
-      - name: Setup Gradle Wrapper Jar
-        run: |
-          mkdir -p gradle/wrapper
-          curl -sL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradle/wrapper/gradle-wrapper.jar -o gradle/wrapper/gradle-wrapper.jar
-
       - name: Build Go Native Core (.so)
         run: |
           BRIDGE_PATH=$(find . -name "bridge.go" | head -n 1)
@@ -73,11 +68,19 @@ jobs:
           # Build armeabi-v7a
           CGO_ENABLED=1 GOOS=android GOARCH=arm GOARM=7 CC=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi30-clang go build -buildmode=c-shared -o "$JNI_ARMV7/libpacketboost_core.so" bridge.go
 
-      - name: Make Gradle Wrapper Executable
-        run: chmod +x gradlew || true
-
       - name: Build Android Debug APK
         run: |
+          SETTINGS_PATH=$(find . -name "settings.gradle.kts" -o -name "settings.gradle" | head -n 1)
+          if [ -z "$SETTINGS_PATH" ]; then
+            echo "Error: settings.gradle.kts not found!"
+            exit 1
+          fi
+          PROJECT_ROOT=$(dirname "$SETTINGS_PATH")
+          cd "$PROJECT_ROOT"
+
+          mkdir -p gradle/wrapper
+          curl -sL https://raw.githubusercontent.com/gradle/gradle/v8.9.0/gradle/wrapper/gradle-wrapper.jar -o gradle/wrapper/gradle-wrapper.jar
+
           GRADLEW_PATH=$(find . -name "gradlew" | head -n 1)
           if [ -n "$GRADLEW_PATH" ]; then
             chmod +x "$GRADLEW_PATH"
