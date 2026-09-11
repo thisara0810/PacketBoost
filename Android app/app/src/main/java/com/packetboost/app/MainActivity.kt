@@ -25,18 +25,20 @@ class MainActivity : ComponentActivity() {
         private const val KEY_SERVER_ADDR = "server_addr"
         private const val KEY_SECRET_KEY = "secret_key"
         private const val KEY_AUTO_CONNECT = "auto_connect"
+        private const val KEY_BOOST_MODE = "boost_mode" // "standalone" or "vps"
     }
 
     private var pendingServerAddr = ""
     private var pendingSecretKey = ""
+    private var pendingIsStandalone = true
 
     private val vpnPrepareLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == RESULT_OK) {
-            startVpnService(pendingServerAddr, pendingSecretKey)
+            startVpnService(pendingServerAddr, pendingSecretKey, pendingIsStandalone)
         } else {
-            Toast.makeText(this, "VPN Permission rejected by user", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "VPN Permission required for network optimization", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -52,33 +54,40 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val savedServerAddr = prefs.getString(KEY_SERVER_ADDR, "YOUR_ORACLE_VPS_IP:29900") ?: "YOUR_ORACLE_VPS_IP:29900"
+        val savedServerAddr = prefs.getString(KEY_SERVER_ADDR, "YOUR_VPS_IP:29900") ?: "YOUR_VPS_IP:29900"
         val savedSecretKey = prefs.getString(KEY_SECRET_KEY, "packetboost_secret") ?: "packetboost_secret"
         val savedAutoConnect = prefs.getBoolean(KEY_AUTO_CONNECT, false)
+        val savedBoostMode = prefs.getString(KEY_BOOST_MODE, "standalone") ?: "standalone"
 
         // Request Notification Permission on Android 13+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
 
-        // Auto-connect on app launch if enabled and server IP is configured
-        if (savedAutoConnect && savedServerAddr.isNotBlank() && savedServerAddr != "YOUR_ORACLE_VPS_IP:29900") {
-            handleConnectRequest(savedServerAddr, savedSecretKey)
+        // Auto-connect on app launch if enabled
+        if (savedAutoConnect) {
+            handleConnectRequest(savedServerAddr, savedSecretKey, savedBoostMode == "standalone")
         }
 
         setContent {
             PacketBoostTheme {
                 val connectionState by TunnelVpnService.connectionState.collectAsState()
 
+                var boostMode by remember { mutableStateOf(savedBoostMode) }
                 var serverAddress by remember { mutableStateOf(savedServerAddr) }
                 var secretKey by remember { mutableStateOf(savedSecretKey) }
                 var autoConnect by remember { mutableStateOf(savedAutoConnect) }
 
                 DashboardScreen(
                     connectionState = connectionState,
+                    boostMode = boostMode,
                     serverAddress = serverAddress,
                     secretKey = secretKey,
                     autoConnect = autoConnect,
+                    onBoostModeChange = { newMode ->
+                        boostMode = newMode
+                        prefs.edit().putString(KEY_BOOST_MODE, newMode).apply()
+                    },
                     onServerAddressChange = { newAddr ->
                         serverAddress = newAddr
                         prefs.edit().putString(KEY_SERVER_ADDR, newAddr).apply()
@@ -95,7 +104,7 @@ class MainActivity : ComponentActivity() {
                         if (connectionState == TunnelVpnService.ConnectionState.CONNECTED) {
                             stopVpnService()
                         } else {
-                            handleConnectRequest(serverAddress, secretKey)
+                            handleConnectRequest(serverAddress, secretKey, boostMode == "standalone")
                         }
                     }
                 )
@@ -103,26 +112,28 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun handleConnectRequest(serverAddr: String, secretKey: String) {
-        if (serverAddr.isBlank() || serverAddr.contains("YOUR_ORACLE_VPS_IP")) {
-            Toast.makeText(this, "Please enter your Oracle Cloud VPS IP address", Toast.LENGTH_SHORT).show()
+    private fun handleConnectRequest(serverAddr: String, secretKey: String, isStandalone: Boolean) {
+        if (!isStandalone && (serverAddr.isBlank() || serverAddr.contains("YOUR_VPS_IP"))) {
+            Toast.makeText(this, "Please enter your VPS IP address or switch to Standalone mode", Toast.LENGTH_SHORT).show()
             return
         }
 
         pendingServerAddr = serverAddr.trim()
         pendingSecretKey = secretKey.trim()
+        pendingIsStandalone = isStandalone
 
         val intent = VpnService.prepare(this)
         if (intent != null) {
             vpnPrepareLauncher.launch(intent)
         } else {
-            startVpnService(pendingServerAddr, pendingSecretKey)
+            startVpnService(pendingServerAddr, pendingSecretKey, pendingIsStandalone)
         }
     }
 
-    private fun startVpnService(serverAddr: String, secretKey: String) {
+    private fun startVpnService(serverAddr: String, secretKey: String, isStandalone: Boolean) {
         val intent = Intent(this, TunnelVpnService::class.java).apply {
             action = TunnelVpnService.ACTION_CONNECT
+            putExtra(TunnelVpnService.EXTRA_IS_STANDALONE, isStandalone)
             putExtra(TunnelVpnService.EXTRA_SERVER_ADDR, serverAddr)
             putExtra(TunnelVpnService.EXTRA_SECRET_KEY, secretKey)
         }

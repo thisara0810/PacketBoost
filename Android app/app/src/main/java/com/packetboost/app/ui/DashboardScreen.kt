@@ -37,9 +37,11 @@ import com.packetboost.app.ui.theme.*
 @Composable
 fun DashboardScreen(
     connectionState: TunnelVpnService.ConnectionState,
+    boostMode: String,
     serverAddress: String,
     secretKey: String,
     autoConnect: Boolean,
+    onBoostModeChange: (String) -> Unit,
     onServerAddressChange: (String) -> Unit,
     onSecretKeyChange: (String) -> Unit,
     onAutoConnectChange: (Boolean) -> Unit,
@@ -169,7 +171,10 @@ fun DashboardScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Latency: 28 ms | RS-FEC: 10:3 | MTU: 1350",
+                                text = if (boostMode == "standalone")
+                                    "Direct 4G/5G Wire-Speed | MTU: 1350 | Cloudflare Anycast DNS"
+                                else
+                                    "Latency: 28 ms | RS-FEC: 10:3 | MTU: 1350",
                                 fontSize = 11.sp,
                                 color = TextSecondary
                             )
@@ -235,7 +240,7 @@ fun DashboardScreen(
                 }
             }
 
-            // Server Config Inputs & Auto-Connect Toggle
+            // Mode Selector & Configuration Card
             Card(
                 colors = CardDefaults.cardColors(containerColor = SurfaceDark),
                 shape = RoundedCornerShape(16.dp),
@@ -243,73 +248,166 @@ fun DashboardScreen(
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        text = "ORACLE CLOUD VPS CONFIGURATION",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextSecondary
-                    )
-
-                    OutlinedTextField(
-                        value = serverAddress,
-                        onValueChange = onServerAddressChange,
-                        label = { Text("Oracle VPS IP : Port") },
-                        placeholder = { Text("e.g. 140.238.xxx.xxx:29900") },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Router,
-                                contentDescription = null,
-                                tint = AccentCyan
+                    // Mode Selection Segmented Header
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(DarkBackground)
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (boostMode == "standalone") PrimaryNeon.copy(alpha = 0.2f) else Color.Transparent,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable(enabled = !isConnected && !isConnecting) {
+                                    onBoostModeChange("standalone")
+                                }
+                        ) {
+                            Text(
+                                text = "⚡ Standalone (No VPS)",
+                                fontSize = 11.sp,
+                                fontWeight = if (boostMode == "standalone") FontWeight.Bold else FontWeight.Normal,
+                                color = if (boostMode == "standalone") PrimaryNeon else TextSecondary,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 8.dp)
                             )
-                        },
-                        singleLine = true,
-                        enabled = !isConnected && !isConnecting,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = PrimaryNeon,
-                            unfocusedBorderColor = SurfaceVariantDark,
-                            focusedLabelColor = PrimaryNeon,
-                            unfocusedLabelColor = TextSecondary,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                        }
 
-                    OutlinedTextField(
-                        value = secretKey,
-                        onValueChange = onSecretKeyChange,
-                        label = { Text("Secret Key (AES-128)") },
-                        placeholder = { Text("Enter tunnel secret key") },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Key,
-                                contentDescription = null,
-                                tint = AccentCyan
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (boostMode == "vps") PrimaryNeon.copy(alpha = 0.2f) else Color.Transparent,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable(enabled = !isConnected && !isConnecting) {
+                                    onBoostModeChange("vps")
+                                }
+                        ) {
+                            Text(
+                                text = "🌐 VPS Tunnel",
+                                fontSize = 11.sp,
+                                fontWeight = if (boostMode == "vps") FontWeight.Bold else FontWeight.Normal,
+                                color = if (boostMode == "vps") PrimaryNeon else TextSecondary,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 8.dp)
                             )
-                        },
-                        singleLine = true,
-                        enabled = !isConnected && !isConnecting,
-                        visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = PrimaryNeon,
-                            unfocusedBorderColor = SurfaceVariantDark,
-                            focusedLabelColor = PrimaryNeon,
-                            unfocusedLabelColor = TextSecondary,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                        }
+                    }
+
+                    if (boostMode == "standalone") {
+                        // Standalone Features Overview
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Speed,
+                                    contentDescription = null,
+                                    tint = PrimaryNeon,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "100% Direct Wire-Speed (Zero Server Lag)",
+                                    fontSize = 11.sp,
+                                    color = TextPrimary
+                                )
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.NetworkCheck,
+                                    contentDescription = null,
+                                    tint = AccentCyan,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "MTU 1350 Clamping (Stops 4G Packet Drops)",
+                                    fontSize = 11.sp,
+                                    color = TextPrimary
+                                )
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Router,
+                                    contentDescription = null,
+                                    tint = AccentCyan,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Cloudflare 1.1.1.1 Anycast Low-Ping DNS",
+                                    fontSize = 11.sp,
+                                    color = TextPrimary
+                                )
+                            }
+                        }
+                    } else {
+                        // VPS Inputs
+                        OutlinedTextField(
+                            value = serverAddress,
+                            onValueChange = onServerAddressChange,
+                            label = { Text("VPS IP : Port") },
+                            placeholder = { Text("e.g. 140.238.xxx.xxx:29900") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Router,
+                                    contentDescription = null,
+                                    tint = AccentCyan
+                                )
+                            },
+                            singleLine = true,
+                            enabled = !isConnected && !isConnecting,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = PrimaryNeon,
+                                unfocusedBorderColor = SurfaceVariantDark,
+                                focusedLabelColor = PrimaryNeon,
+                                unfocusedLabelColor = TextSecondary,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        OutlinedTextField(
+                            value = secretKey,
+                            onValueChange = onSecretKeyChange,
+                            label = { Text("Secret Key (AES-128)") },
+                            placeholder = { Text("Enter tunnel secret key") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Key,
+                                    contentDescription = null,
+                                    tint = AccentCyan
+                                )
+                            },
+                            singleLine = true,
+                            enabled = !isConnected && !isConnecting,
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = PrimaryNeon,
+                                unfocusedBorderColor = SurfaceVariantDark,
+                                focusedLabelColor = PrimaryNeon,
+                                unfocusedLabelColor = TextSecondary,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
 
                     // Auto Connect Toggle Switch
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 4.dp),
+                            .padding(top = 2.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
@@ -322,7 +420,7 @@ fun DashboardScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Auto-Connect on App Launch",
+                                text = "Auto-Boost on App Launch",
                                 fontSize = 12.sp,
                                 color = TextPrimary,
                                 fontWeight = FontWeight.Medium
@@ -345,7 +443,10 @@ fun DashboardScreen(
 
             // Bottom Protocol Note
             Text(
-                text = "Engine: KCP ARQ (fast3) | Reed-Solomon FEC 10:3 | Server BBR v3",
+                text = if (boostMode == "standalone")
+                    "Engine: On-Device Cellular Accelerator | MTU 1350 Clamping | Cloudflare Anycast DNS"
+                else
+                    "Engine: KCP ARQ (fast3) | Reed-Solomon FEC 10:3 | Server BBR v3",
                 fontSize = 10.sp,
                 color = TextSecondary,
                 textAlign = TextAlign.Center,
