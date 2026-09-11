@@ -95,6 +95,12 @@ jobs:
           PROJECT_ROOT=$(dirname "$SETTINGS_PATH")
           cd "$PROJECT_ROOT"
 
+          # Ensure android.useAndroidX=true in gradle.properties
+          touch gradle.properties
+          echo "android.useAndroidX=true" >> gradle.properties
+          echo "android.nonTransitiveRClass=true" >> gradle.properties
+          echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> gradle.properties
+
           # Auto-remove broken test references from app/build.gradle.kts
           find . -name "build.gradle.kts" -exec sed -i '/androidTestImplementation/d' {} +
           find . -name "build.gradle.kts" -exec sed -i '/ui\.test/d' {} +
