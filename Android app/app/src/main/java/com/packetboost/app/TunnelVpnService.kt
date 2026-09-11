@@ -174,7 +174,7 @@ class TunnelVpnService : VpnService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                getString(R.string.vpn_service_notification_channel),
+                "PacketBoost Tunnel Service",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
                 description = "PacketBoost VPN status notification"

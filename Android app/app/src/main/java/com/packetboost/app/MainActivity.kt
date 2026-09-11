@@ -20,10 +20,12 @@ import com.packetboost.app.ui.theme.PacketBoostTheme
 
 class MainActivity : ComponentActivity() {
 
-    private const val PREFS_NAME = "packetboost_prefs"
-    private const val KEY_SERVER_ADDR = "server_addr"
-    private const val KEY_SECRET_KEY = "secret_key"
-    private const val KEY_AUTO_CONNECT = "auto_connect"
+    companion object {
+        private const val PREFS_NAME = "packetboost_prefs"
+        private const val KEY_SERVER_ADDR = "server_addr"
+        private const val KEY_SECRET_KEY = "secret_key"
+        private const val KEY_AUTO_CONNECT = "auto_connect"
+    }
 
     private var pendingServerAddr = ""
     private var pendingSecretKey = ""
@@ -47,7 +49,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate()
+        super.onCreate(savedInstanceState)
 
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val savedServerAddr = prefs.getString(KEY_SERVER_ADDR, "YOUR_ORACLE_VPS_IP:29900") ?: "YOUR_ORACLE_VPS_IP:29900"
