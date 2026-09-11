@@ -8,17 +8,13 @@ import "C"
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
-	"net"
 	"os"
 	"sync"
 	"sync/atomic"
 	"time"
-	"unsafe"
 
-	"github.com/klauspost/reedsolomon"
 	"github.com/xtaci/kcp-go/v5"
 	"github.com/xtaci/smux"
 )
@@ -34,11 +30,11 @@ type EngineStats struct {
 }
 
 var (
-	engineCtx      context.Context
-	engineCancel   context.CancelFunc
-	engineWg       sync.WaitGroup
-	isRunning      bool
-	engineLock     sync.Mutex
+	engineCtx    context.Context
+	engineCancel context.CancelFunc
+	engineWg     sync.WaitGroup
+	isRunning    bool
+	engineLock   sync.Mutex
 
 	stats EngineStats
 )
@@ -115,11 +111,15 @@ func runKcpClientLoop(ctx context.Context, tunFile *os.File, serverAddr, secretK
 	dataShards := 10
 	parityShards := 3
 
-	// Create KCP Session over UDP
-	block, err := kcp.NewAES128BlockCrypt([]byte(secretKey))
-	if err != nil {
-		log.Printf("[PacketBoost-Go] Error initializing AES-128 block cipher: %v\n", err)
-		return
+	// Create KCP Session over UDP using PBKDF2 AES-128
+	var block kcp.BlockCrypt
+	var err error
+	if secretKey != "" {
+		block, err = kcp.NewPBKDF2AES128([]byte(secretKey))
+		if err != nil {
+			log.Printf("[PacketBoost-Go] Error initializing AES-128 cipher: %v\n", err)
+			return
+		}
 	}
 
 	sess, err := kcp.DialWithOptions(serverAddr, block, dataShards, parityShards)
