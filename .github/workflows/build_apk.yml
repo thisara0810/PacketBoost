@@ -181,6 +181,9 @@ jobs:
             sed -i 's/private const val/private val/g' "$MAIN_ACTIVITY"
           fi
 
+          # 4. Use system default icon instead of missing mipmap icon
+          sed -i 's/@mipmap\/ic_launcher/@android:drawable\/sym_def_app_icon/g' "$MANIFEST_PATH"
+
       - name: Build Android Debug APK
         run: |
           SETTINGS_PATH=$(find . -name "settings.gradle.kts" -o -name "settings.gradle" | head -n 1)
