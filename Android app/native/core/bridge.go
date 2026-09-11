@@ -111,13 +111,21 @@ func runKcpClientLoop(ctx context.Context, tunFile *os.File, serverAddr, secretK
 	dataShards := 10
 	parityShards := 3
 
-	// Create KCP Session over UDP using PBKDF2 AES-128
+	// Create KCP Session over UDP using AES-128 Block Cipher
 	var block kcp.BlockCrypt
 	var err error
 	if secretKey != "" {
-		block, err = kcp.NewPBKDF2AES128([]byte(secretKey))
+		pass := []byte(secretKey)
+		if len(pass) < 16 {
+			pad := make([]byte, 16)
+			copy(pad, pass)
+			pass = pad
+		} else if len(pass) > 16 {
+			pass = pass[:16]
+		}
+		block, err = kcp.NewAESBlockCrypt(pass)
 		if err != nil {
-			log.Printf("[PacketBoost-Go] Error initializing AES-128 cipher: %v\n", err)
+			log.Printf("[PacketBoost-Go] Error initializing AES block cipher: %v\n", err)
 			return
 		}
 	}
