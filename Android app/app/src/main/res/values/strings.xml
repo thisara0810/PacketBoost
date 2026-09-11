@@ -1,6 +1,0 @@
-<resources>
-    <string name="app_name">PacketBoost</string>
-    <string name="vpn_service_notification_channel">PacketBoost Tunnel Service</string>
-    <string name="vpn_service_notification_title">PacketBoost Acceleration Active</string>
-    <string name="vpn_service_notification_text">KCP/FEC Tunnel is accelerating cellular network traffic.</string>
-</resources>
